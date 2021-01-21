@@ -172,7 +172,7 @@ if __name__ == "__main__":
         template_lines = template_reader(template_file)
         ports = calculate_ports(int(DEFAULTS["PORT_RANGE_START"]), template_lines)
         if not args.docker_compose:
-		print("echo Defaults selected or no values given")
+            print("echo Defaults selected or no values given")
         script_lines.append("echo using the following ports:")
         settings.update(DEFAULTS)
     else:
