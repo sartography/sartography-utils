@@ -1,0 +1,7 @@
+{
+  "source":"/home/<user>/sartography/sartography-libraries/projects/sartography-workflow-lib/package.json",
+  "update repos":[
+    "/home/<user>/sartography/cr-connect-frontend/",
+    "/home/<user>/sartography/cr-connect-bpmn/"
+  ]
+}

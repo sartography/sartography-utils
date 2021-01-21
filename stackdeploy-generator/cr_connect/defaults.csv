@@ -1,0 +1,8 @@
+"DB_USER","crc_user"
+"DB_PASS","crc_pass"
+"DOCKER_IMAGE_VERSION","dev"
+"POSTGRES_MULTIPLE_DATABASES","crc_dev,crc_test,pb,pb_test"
+"PATH_BASE","$HOME/sartography/docker-volumes/cr-connect/"
+"PRODUCTION","false"
+"PORT_RANGE_START",5000
+"DEPLOYMENT_IDENTIFIER",""
