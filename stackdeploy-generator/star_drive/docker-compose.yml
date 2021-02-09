@@ -1,0 +1,57 @@
+# use this to enforce order of ports
+# Backend: ${BACKEND_PORT}
+# Elasticsearch port 1 : ${ES_PORT_1}
+# Elasticsearch port 2 : ${ES_PORT_2}
+# Db: ${DB_PORT}
+# Frontend : ${FRONTEND_PORT}
+version: "3.7"
+services:
+  db_${DEPLOYMENT_IDENTIFIER}:
+    container_name: stardrive_db${DEPLOYMENT_IDENTIFIER}
+    image: sartography/cr-connect-db
+    volumes:
+      - ${PATH_BASE}postgres:/var/lib/postgresql/data
+    ports:
+      - 127.0.0.1:${DB_PORT}:5432
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_MULTIPLE_DATABASES=stardrive,stardrive_test
+
+  es_${DEPLOYMENT_IDENTIFIER}:
+    container_name: stardrive_es${DEPLOYMENT_IDENTIFIER}
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.8.11
+    environment:
+      - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - ${PATH_BASE}elasticsearch:/usr/share/elasticsearch/data
+    ports:
+      - 127.0.0.1:${ES_PORT_1}:9200
+      - 127.0.0.1:${ES_PORT_2}:9300
+
+  backend_${DEPLOYMENT_IDENTIFIER}:
+    container_name: stardrive_backend${DEPLOYMENT_IDENTIFIER}
+    image: stardrive-test-backend:latest
+    environment:
+      - "ES=stardrive_es${DEPLOYMENT_IDENTIFIER}"
+    ports:
+      - 127.0.0.1:${BACKEND_PORT}:5000
+    volumes:
+      - ${PATH_BASE}config/config.py:/star-drive/backend/instance/config.py
+    restart: unless-stopped
+    depends_on:
+      - es_${DEPLOYMENT_IDENTIFIER}
+      - db_${DEPLOYMENT_IDENTIFIER}
+
+
+  frontend_${DEPLOYMENT_IDENTIFIER}:
+    image: stardrive-test-frontend:latest
+    environment:
+      - "API_URL=http://stardrive_backend${DEPLOYMENT_IDENTIFIER}:${BACKEND_PORT}"
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT}:4200"
+    depends_on:
+      - es_${DEPLOYMENT_IDENTIFIER}
+      - db_${DEPLOYMENT_IDENTIFIER}
+      - backend_${DEPLOYMENT_IDENTIFIER}

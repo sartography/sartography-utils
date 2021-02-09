@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 from string import Template
 from os.path import expandvars
+import os
 import sys
 import re
 
@@ -43,6 +44,7 @@ def query_yes_no(question, default="yes"):
 
 
 def calculate_ports(port_range_start, templatelines, skipcheck=False):
+    port_range_start = int(port_range_start)
     if port_range_start < 1024 and not skipcheck:
         print("use of reserved ports is forbidden in dev environments")
         if not query_yes_no("Do you want to continue?"):
@@ -87,10 +89,17 @@ def docker_compose_generator(inlines, outfile, data):
     for line in inlines:
         a_line = Template(line)
         result = a_line.safe_substitute(data)
+        if "${PATH_BASE}" in line:
+            cleaned = re.sub(r'^.*?/', '/', result).strip()
+            print(cleaned)
+            host_volume = Path(expandvars(cleaned.split(":")[0]))
+            if "." in str(host_volume).split(os.path.sep)[-1]:
+                host_volume = Path(os.path.dirname(host_volume))
+            print(host_volume, type(host_volume))
+            host_volume.mkdir(parents=True, exist_ok=True)
         outlines.append(result)
     with open(outfile, "w+") as file:
         file.writelines(outlines)
-    exit()
 
 
 def template_reader(templatefile):
@@ -104,6 +113,22 @@ def strings_to_classes(a_string):
         return eval(a_string)
     else:
         return ""
+
+
+def find_and_generate_reqs(template_path, data):
+    for this_path, dirnames, filenames in os.walk(template_path):
+        for dirname in dirnames:
+            newdirname = settings["PATH_BASE"] + dirname
+            Path(newdirname).mkdir(parents=True, exist_ok=True)
+        for filename in filenames:
+            if filename not in ("defaults.csv", "args.csv", "docker-compose.yml"):
+                filepath = Path(this_path)
+                filepath = filepath.joinpath(filename)
+                filepath = expandvars(filepath)
+                dirname = str(this_path).split(os.path.sep)[-1]
+                with open(filepath) as a_file:
+                    outfile = "%s%s/%s" % (data['PATH_BASE'], dirname, filename)
+                    docker_compose_generator(a_file.readlines(), outfile, data)
 
 
 if __name__ == "__main__":
@@ -223,7 +248,11 @@ if __name__ == "__main__":
             print("output would overwrite template, exiting")
             exit(1)
         else:
+            full_template_file_path = os.path.realpath(template_file)
+            path = Path(full_template_file_path).parent.as_posix()
+            find_and_generate_reqs(template_path=str(path), data=settings)
             docker_compose_generator(inlines=template_lines, outfile=args.docker_compose, data=settings)
+            exit()
     else:
         stdio_script(script_lines)
         exit()

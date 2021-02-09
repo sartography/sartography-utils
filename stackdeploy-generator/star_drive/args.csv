@@ -1,0 +1,9 @@
+short,long,help,default,action,type,choices
+-u,--db-user,database username default: crc_user,,,,
+-p,--db-pass,database password default: crc_pass,,,,
+-r,--port-range,"start at a port range, will use the port specified + 5, , minimum 1024",,,int,"range(1024, 65530)"
+-v,--docker-image-version,"will use the version specified, default: latest",,,,
+-i,--deployment-identifier,"blank by default, add a modifier to run multiple stacks",,,,
+-P,--path-base,path for your docker volumes. Default of $HOME/sartography/docker-volumes/star-drive/<deployment_identifier>/,,,,
+-e,--production,"Specifies if production or dev, default dev",,,,
+
