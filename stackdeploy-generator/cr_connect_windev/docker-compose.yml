@@ -1,0 +1,105 @@
+# use this to enforce order of ports
+# Backend: ${BACKEND_PORT}
+# Protocol builder : ${PB_PORT}
+# Bpmn: ${BPMN_PORT}
+# Db: ${DB_PORT}
+# Frontend : ${FRONTEND_PORT}
+version: "3.7"
+services:
+  db${DEPLOYMENT_IDENTIFIER}:
+    container_name: db${DEPLOYMENT_IDENTIFIER}
+    image: sartography/cr-connect-db:${DOCKER_IMAGE_VERSION}
+    volumes:
+      - ${PATH_BASE}postgres:/var/lib/postgresql/data
+    ports:
+      - 127.0.0.1:${DB_PORT}:5432
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_MULTIPLE_DATABASES=crc_dev,crc_test,pb,pb_test
+        
+  pb${DEPLOYMENT_IDENTIFIER}:
+    container_name: pb${DEPLOYMENT_IDENTIFIER}
+    depends_on:
+       - db${DEPLOYMENT_IDENTIFIER}
+    image: sartography/protocol-builder-mock:${DOCKER_IMAGE_VERSION}
+    environment:
+      - APPLICATION_ROOT=/
+      - CORS_ALLOW_ORIGINS=localhost:5000,backend${DEPLOYMENT_IDENTIFIER}:5000,localhost:5002,bpmn${DEPLOYMENT_IDENTIFIER}:5002,localhost:4200,frontend${DEPLOYMENT_IDENTIFIER}:4200
+      - DB_HOST=db${DEPLOYMENT_IDENTIFIER}
+      - DB_NAME=pb_test
+      - DB_PASSWORD=${DB_PASS}
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - PORT0=${PB_PORT}
+      - UPGRADE_DB=true
+    ports:
+      - "127.0.0.1:${PB_PORT}:${PB_PORT}"
+    command: ./wait-for-it.sh db${DEPLOYMENT_IDENTIFIER}:5432 -t 0 -- ./docker_run.sh
+
+  backend${DEPLOYMENT_IDENTIFIER}:
+    container_name: backend${DEPLOYMENT_IDENTIFIER}
+    depends_on:
+       - db${DEPLOYMENT_IDENTIFIER}
+       - pb${DEPLOYMENT_IDENTIFIER}
+    image: cr-connect-workflow-windev:${DOCKER_IMAGE_VERSION}
+    environment:
+      - APPLICATION_ROOT=/
+      - CORS_ALLOW_ORIGINS=localhost:${BPMN_PORT},bpmn:${BPMN_PORT},localhost:${FRONTEND_PORT},frontend:${FRONTEND_PORT},localhost:4200
+      - DB_HOST=db${DEPLOYMENT_IDENTIFIER}
+      - DB_NAME=crc_dev
+      - DB_PASSWORD=${DB_PASS}
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DEVELOPMENT=true
+      - LDAP_URL=mock
+#      - LDAP_URL=ldap.virginia.edu      
+      - PB_BASE_URL=http://pb${DEPLOYMENT_IDENTIFIER}:${PB_PORT}/v2.0/
+      - PB_ENABLED=true
+      - PORT0=${BACKEND_PORT}
+      - PRODUCTION=${PRODUCTION}
+      - RESET_DB=true
+#     - ADMIN_UIDS=ajl2j,cah3us,cl3wf # uncomment this to make the default testing user NOT admin
+      - TESTING=false
+      - UPGRADE_DB=true
+    ports:
+      - "127.0.0.1:${BACKEND_PORT}:${BACKEND_PORT}"
+    command: ./wait-for-it.sh pb${DEPLOYMENT_IDENTIFIER}:${PB_PORT} -t 0 -- ./docker_run.sh
+
+  bpmn${DEPLOYMENT_IDENTIFIER}:
+    container_name: bpmn${DEPLOYMENT_IDENTIFIER}
+    depends_on:
+       - db${DEPLOYMENT_IDENTIFIER}
+       - backend${DEPLOYMENT_IDENTIFIER}
+       - pb${DEPLOYMENT_IDENTIFIER}
+    image: sartography/cr-connect-bpmn:${DOCKER_IMAGE_VERSION}
+    environment:
+      - API_URL=http://localhost:${BACKEND_PORT}/v1.0
+      - BASE_HREF=/bpmn/
+      - DEPLOY_URL=/bpmn/
+      - HOME_ROUTE=home
+      - PORT0=${BPMN_PORT}
+      - PRODUCTION=${PRODUCTION}
+    ports:
+      - "127.0.0.1:${BPMN_PORT}:${BPMN_PORT}"
+
+  frontend${DEPLOYMENT_IDENTIFIER}:
+    container_name: frontend${DEPLOYMENT_IDENTIFIER}
+    depends_on:
+       - db${DEPLOYMENT_IDENTIFIER}
+       - backend${DEPLOYMENT_IDENTIFIER}
+    image: sartography/cr-connect-frontend:${DOCKER_IMAGE_VERSION}
+    environment:
+      - API_URL=http://localhost:${BACKEND_PORT}/v1.0
+      - BASE_HREF=/app/
+      - DEPLOY_URL=/app/
+      - HOME_ROUTE=home
+      - PORT0=${FRONTEND_PORT}
+      - PRODUCTION=${PRODUCTION}
+      - IRB_URL=""
+      - GOOGLE_ANALYTICS_KEY=""
+      - SENTRY_KEY=""
+      - TITLE=""
+      - USER="ADMIN"
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT}:${FRONTEND_PORT}"
