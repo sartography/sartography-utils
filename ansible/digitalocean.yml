@@ -1,0 +1,197 @@
+- hosts: prod
+  user: root
+  become: yes
+  gather_facts: no
+  tasks:
+      - name: create sartography group
+        group:
+            name: sartography
+
+      - name: create sartography user
+        user:
+            name: sartography
+            comment: "Sartography Ops"
+            append: yes
+            groups: 
+              - sartography
+              - sudo
+              - www-data
+            shell: /bin/bash
+            generate_ssh_key: yes
+            ssh_key_bits: 4096
+            ssh_key_file: .ssh/id_rsa
+
+      - name: set authorized keys for sartography
+        authorized_key:
+            user: sartography
+            state: present
+            key: '{{ item }}'
+        with_file:
+            - public_keys/elad
+            - public_keys/elad_laptop
+            - public_keys/dan
+            - public_keys/aaron
+
+      - name: set timezone to utc
+        timezone:
+            name: UTC
+
+      - name: Update apt cache
+        apt: update_cache=yes cache_valid_time=3600
+
+      - name: Update all packages to their latest version
+        apt:
+          upgrade: yes
+          update_cache: yes
+          cache_valid_time: 3600
+
+      - name: Install some pre-requisites
+        apt:
+          name: "{{ packages }}"
+        vars:
+          packages:
+            - aptitude
+            - apt-transport-https
+            - ca-certificates
+            - curl
+            - software-properties-common
+            - gnupg-agent
+
+      - name: Add an apt key for nginx
+        apt_key:
+          keyserver: keyserver.ubuntu.com
+          id: ABF5BD827BD9BF62
+
+      - name: Add key for Postgres repo
+        apt_key: 
+          url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          state: present
+
+      - name: Add an apt key for nodejs
+        apt_key:
+          keyserver: keyserver.ubuntu.com
+          id: 1655A0AB68576280
+
+      - name: Add an apt signing key for Docker
+        apt_key:
+          url: https://download.docker.com/linux/ubuntu/gpg
+          state: present
+
+      - name: Add apt repository for postgres
+        apt_repository: 
+         repo: deb http://apt.postgresql.org/pub/repos/apt/ focal-pgdg main
+         state: present
+
+      - name: Add apt repository for nginx
+        apt_repository:
+          repo: deb http://nginx.org/packages/ubuntu/ focal nginx
+          state: present
+
+      - name: Add apt repository for nginx src
+        apt_repository:
+          repo: deb-src http://nginx.org/packages/ubuntu/ focal nginx
+          state: present 
+
+      - name: Add apt repository for npm
+        apt_repository:
+          repo: deb https://deb.nodesource.com/node_10.x focal main
+          state: present 
+
+      - name: Add apt repository for npm src
+        apt_repository:
+          repo: deb-src https://deb.nodesource.com/node_10.x focal main
+          state: present 
+
+      - name: Add apt repository for stable version
+        apt_repository:
+          repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+          state: present
+
+      - name: update apt
+        apt:
+            update_cache: true
+
+      - name: Install a list of packages
+        apt:
+          name: "{{ packages }}"
+        vars:
+          packages:
+            - htop
+            - curl
+            - unzip
+            - iptables-persistent
+            - git
+            - s3cmd
+            - python3
+            - python3-dev
+            - python3-virtualenv
+            - virtualenvwrapper
+            - python3-psycopg2
+            - build-essential
+            - libpq-dev
+            - postgresql-client-11
+            - redis-tools
+            - nginx
+            - supervisor
+            - python3-certbot-nginx
+            - nodejs
+            - vim
+            - docker-ce
+            - docker-ce-cli 
+            - containerd.io
+            - docker-compose
+      # DEV ONLY
+            - postgresql-12
+            - redis-server
+
+      - name: Add user to docker group
+        user:
+          name: sartography
+          group: docker
+
+      - name: create sartography database
+        become: true
+        become_user: postgres
+        postgresql_db:
+            name: sartography
+
+      - name: create deploy database user
+        become: true
+        become_user: postgres
+        postgresql_user:
+            name: deploy
+            password: password123
+
+      - name: grant deploy database user permissions on sartography database
+        become: true
+        become_user: postgres
+        postgresql_privs:
+            database: postgres
+            privs: ALL
+            type: database
+            obj: sartography
+            role: deploy
+      # END DEV ONLY
+
+      - name: create log directory
+        file:
+            path: /var/log/sartography
+            state: directory
+            owner: sartography
+            group: sartography
+            mode: 0770
+        become_user: root
+
+      - name: create www/sartography directory
+        file:
+            path: /var/www/sartography
+            state: directory
+            owner: www-data
+            group: www-data
+            mode: 0770
+
+      - name: install yarn node.js package.
+        npm:
+            name: yarn
+            global: yes
+            state: present
