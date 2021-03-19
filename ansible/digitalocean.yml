@@ -102,7 +102,7 @@
           repo: deb-src https://deb.nodesource.com/node_10.x focal main
           state: present 
 
-      - name: Add apt repository for stable version
+      - name: Add apt repository for stable docker version
         apt_repository:
           repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
           state: present
