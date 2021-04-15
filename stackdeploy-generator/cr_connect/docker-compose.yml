@@ -8,7 +8,7 @@ version: "3.7"
 services:
   db${DEPLOYMENT_IDENTIFIER}:
     container_name: db${DEPLOYMENT_IDENTIFIER}
-    image: sartography/cr-connect-db:${DOCKER_IMAGE_VERSION}
+    image: quay.io/sartography/cr-connect-db:${DOCKER_IMAGE_VERSION}
     volumes:
       - ${PATH_BASE}postgres:/var/lib/postgresql/data
     ports:
@@ -22,12 +22,12 @@ services:
     container_name: pb${DEPLOYMENT_IDENTIFIER}
     depends_on:
        - db${DEPLOYMENT_IDENTIFIER}
-    image: sartography/protocol-builder-mock:${DOCKER_IMAGE_VERSION}
+    image: quay.io/sartography/protocol-builder-mock:${DOCKER_IMAGE_VERSION}
     environment:
       - APPLICATION_ROOT=/
       - CORS_ALLOW_ORIGINS=localhost:5000,backend${DEPLOYMENT_IDENTIFIER}:5000,localhost:5002,bpmn${DEPLOYMENT_IDENTIFIER}:5002,localhost:4200,frontend${DEPLOYMENT_IDENTIFIER}:4200
       - DB_HOST=db${DEPLOYMENT_IDENTIFIER}
-      - DB_NAME=pb_test
+      - DB_NAME=pb
       - DB_PASSWORD=${DB_PASS}
       - DB_PORT=5432
       - DB_USER=${DB_USER}
@@ -42,7 +42,7 @@ services:
     depends_on:
        - db${DEPLOYMENT_IDENTIFIER}
        - pb${DEPLOYMENT_IDENTIFIER}
-    image: sartography/cr-connect-workflow:${DOCKER_IMAGE_VERSION}
+    image: quay.io/sartography/cr-connect-workflow:${DOCKER_IMAGE_VERSION}
     environment:
       - APPLICATION_ROOT=/
       - CORS_ALLOW_ORIGINS=localhost:${BPMN_PORT},bpmn:${BPMN_PORT},localhost:${FRONTEND_PORT},frontend:${FRONTEND_PORT},localhost:4200
@@ -72,7 +72,7 @@ services:
        - db${DEPLOYMENT_IDENTIFIER}
        - backend${DEPLOYMENT_IDENTIFIER}
        - pb${DEPLOYMENT_IDENTIFIER}
-    image: sartography/cr-connect-bpmn:${DOCKER_IMAGE_VERSION}
+    image: quay.io/sartography/cr-connect-bpmn:${DOCKER_IMAGE_VERSION}
     environment:
       - API_URL=http://localhost:${BACKEND_PORT}/v1.0
       - BASE_HREF=/bpmn/
@@ -88,7 +88,7 @@ services:
     depends_on:
        - db${DEPLOYMENT_IDENTIFIER}
        - backend${DEPLOYMENT_IDENTIFIER}
-    image: sartography/cr-connect-frontend:${DOCKER_IMAGE_VERSION}
+    image: quay.io/sartography/cr-connect-frontend:${DOCKER_IMAGE_VERSION}
     environment:
       - API_URL=http://localhost:${BACKEND_PORT}/v1.0
       - BASE_HREF=/app/
