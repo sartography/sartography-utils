@@ -1,0 +1,243 @@
+- hosts: star-drive
+  vars:
+    db_user: ed_user
+    db_name: stardrive
+  vars_prompt:
+    - name: "db_password"
+      prompt: "Please set a password for your database user"  
+  user: sartography
+  gather_facts: no
+  tasks:
+    - name: get es key
+      shell: wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+      become: yes
+      
+    - name: add es repo
+      ansible.builtin.apt_repository:
+        repo: deb https://artifacts.elastic.co/packages/6.x/apt stable main
+        state: present
+        filename: elastic-6.x
+      become: yes
+
+
+    - name: Install JDK
+      apt:
+        name: openjdk-8-jdk
+        update_cache: yes      
+      become: yes    
+       
+    - name: Install prereque packages
+      apt:
+        name: "{{ packages }}"
+        update_cache: yes
+      vars:
+        packages:
+        - aptitude
+        - acl   
+        - python3 
+        - python3-dev
+        - libssl-dev
+        - libffi-dev
+        - apt-transport-https
+        - elasticsearch
+        - apache2-dev
+      become: yes    
+
+    - name: Install node with snap
+      community.general.snap:
+        name:
+          - node
+        classic: yes
+        channel: 9/stable
+      become: yes
+      
+    - name: "enable npm update checking"
+      shell: "npm ; sudo chown -R $USER:$(id -gn $USER) /home/sartography/.config"
+    
+    - name: Clone star-drive.
+      git:
+        repo: https://github.com/sartography/star-drive.git
+        version: staging
+        dest: ~/star-drive/
+        accept_hostkey: yes
+        force: yes
+        # ssh-agent doesn't allow key to pass through remote sudo commands.
+
+    - name: Install specified python requirements in virtualenv
+      pip:
+        requirements: ~/star-drive/backend/requirements.txt
+        virtualenv: ~/python-venv/
+        virtualenv_python: python3
+
+    - name: bind to localhost for elastic search
+      lineinfile:
+        path: /etc/elasticsearch/elasticsearch.yml
+        regexp: '^network.host'
+        insertafter: '^#network.host'
+        line: 'network.host: 127.0.0.1'
+      become: yes
+     
+    - name: bind to port 9200 for elastic search
+      lineinfile:
+        path: /etc/elasticsearch/elasticsearch.yml
+        regexp: '^http.port'
+        insertafter: '^#http.port'
+        line: 'http.port: 9200'
+      become: yes
+
+    - name: start and enable service elasticsearch and daemon-reload to pick up config changes
+      systemd:
+        state: started
+        daemon_reload: yes
+        enabled: yes
+        name: elasticsearch
+      become: yes
+
+    - name: stop docker service
+      service:
+        name: docker
+        state: stopped
+      become: yes
+
+    - name: stop redis service
+      service:
+        name: redis
+        state: stopped
+      become: yes
+
+    #- name: copy docker-compose file
+    #  copy:
+    #    src: ../../star-drive
+    #    dest: /home/sartography
+    #    mode: '600'
+    #- name: start docker-compose for star-drive dev
+    #  shell: docker-compose -f /home/sartography/star-drive/docker-compose.yml up --detach
+
+    - name: Create db user, set password, grant privs
+      community.postgresql.postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        role_attr_flags: NOCREATEDB,NOSUPERUSER
+      become: true
+      become_user: postgres
+  
+    - name: Create the database specified in vars
+      community.postgresql.postgresql_db: 
+        name={{ db_name }}
+        template='template0'
+        state=present
+      become: true
+      become_user: postgres
+     
+    - name: Create the test database specified in vars
+      community.postgresql.postgresql_db: name={{ db_name }}_test
+           template='template0'
+           state=present
+      become: true
+      become_user: postgres
+    
+    - name: Ensure user has access to the new database
+      community.postgresql.postgresql_user: db={{ db_name }}
+           name={{ db_user }}
+           password={{ db_password }}
+           priv=ALL
+           state=present
+      become: true
+      become_user: postgres
+
+    - name: Ensure user has access to the new test database
+      community.postgresql.postgresql_user: db={{ db_name }}
+           name={{ db_user }}
+           password={{ db_password }}
+           priv=ALL
+           state=present
+      become: true
+      become_user: postgres
+
+    - name: Ensure user does not have unnecessary permissions
+      community.postgresql.postgresql_user: name={{ db_user }}
+           role_attr_flags=NOSUPERUSER,NOCREATEDB
+           state=present
+      become: true
+      become_user: postgres
+
+    - name: Grant db_user access
+      community.postgresql.postgresql_pg_hba:
+        dest: /etc/postgresql/12/main/pg_hba.conf
+        contype: host
+        users: "{{ db_user }}"
+        source: 127.0.0.1/32
+        method: md5
+      become: true
+      become_user: postgres
+
+    - name: run npm install
+      shell: npm install
+ 
+    - name: Install Angular.js
+      npm:
+        name: "@angular/cli@10"
+        global: yes
+        state: present
+      become: yes 
+      
+    - name: Ensures {{project_root}}/conf dir exists
+      file: path=~/star-drive/backend/instance state=directory
+    - name: Copy configs
+      copy:
+        src: ~/star-drive/backend/config
+        dest: ~/star-drive/backend/instance
+        remote_src: yes
+        
+
+    - name: Copy default config into the correct location
+      copy:
+        src: ~/star-drive/backend/instance/config/default.py
+        dest: ~/star-drive/backend/instance/config.py
+        remote_src: yes
+    
+    - name: Copy init script
+      copy:
+        src: ./runflask.sh
+        dest: ~/
+
+    - name: run flask server 
+      shell: bash  ~/runflask.sh
+      environment:
+        FLASK_APP: ~/star-drive/app/__init__.py
+
+    - name: install angular prereqs 
+      shell: cd ~/star-drive/frontend && npm install
+      
+    #- name: compile angular server 
+    #  shell: cd ~/star-drive/frontend && ng build
+
+    - name: copy dists to www-data 
+      copy:
+        src: /home/elad/sartography/star-drive/frontend/dist/star-drive/
+        dest: /var/www/
+        #remote_src: yes
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      become: yes
+
+
+
+    #- name: migrate flask db    
+    #  shell: bash "source ~/python-venv/bin/activate && flask db migrate"
+    #  environment:
+    #    FLASK_APP: ~/star-dive/app/__init__.py
+
+    #- name: init flask db
+    #  shell: flask initdb
+    #  environment:
+    #    FLASK_APP: ~/star-dive/app/__init__.py
+
+    #- name: run flask server 
+    #  shell: nohup flask run &
+    #  environment:
+    #    FLASK_APP: ~/star-dive/app/__init__.py
+
+           
+  

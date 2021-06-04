@@ -1,4 +1,4 @@
-- hosts: prod
+- hosts: digital_ocean
   user: root
   become: yes
   gather_facts: no
@@ -196,3 +196,10 @@
             name: yarn
             global: yes
             state: present
+      - name: enable passwordless sudo
+        lineinfile:
+          path: /etc/sudoers
+          state: present
+          regexp: '^%sudo'
+          line: '%sudo ALL=(ALL) NOPASSWD: ALL'
+          validate: 'visudo -cf %s'
