@@ -4,21 +4,24 @@
     db_name: stardrive
   vars_prompt:
     - name: "db_password"
-      prompt: "Please set a password for your database user"  
+      prompt: "Please set a password for your database user"
+      default: "ed_pass"
+    - name: "ba_password"
+      prompt: "Please set a password for HTTP basic auth"
+      default: "pQNww!iXo9EEi988&kr"
   user: sartography
   gather_facts: no
   tasks:
     - name: get es key
       shell: wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
       become: yes
-      
+
     - name: add es repo
       ansible.builtin.apt_repository:
         repo: deb https://artifacts.elastic.co/packages/6.x/apt stable main
         state: present
         filename: elastic-6.x
       become: yes
-
 
     - name: Install JDK
       apt:
@@ -41,6 +44,7 @@
         - apt-transport-https
         - elasticsearch
         - apache2-dev
+        - python3-passlib
       become: yes    
 
     - name: Install node with snap
@@ -50,11 +54,48 @@
         classic: yes
         channel: 9/stable
       become: yes
-      
+
+    - name: Check whether swap is already enabled or not
+      shell: cat /etc/sysctl.conf
+      register: swap_enabled
+      become: true
+
+    - block:
+        - name: create swap file
+          command: dd if=/dev/zero of=/swapfile bs=1G count=4
+
+        - name: change permission type
+          file: path=/swapfile mode=600 state=file
+
+        - name: setup swap
+          command: mkswap /swapfile
+
+        - name: create swap
+          command: swapon /swapfile
+
+        - name: Add to fstab
+          action: lineinfile dest=/etc/fstab regexp="swapfile" line="/swapfile none swap sw 0 0" state=present
+
+        - name: start swap
+          command: swapon -a
+
+        - name: set swapiness
+          sysctl:
+            name: vm.swappiness
+            value: "10"
+
+        - name: set swapiness
+          sysctl:
+            name: vm.vfs_cache_pressure
+            value: "50"
+
+      when: swap_enabled.stdout.find('swappiness') == -1
+      become: true
+
     - name: "enable npm update checking"
       shell: "npm ; sudo chown -R $USER:$(id -gn $USER) /home/sartography/.config"
     
-    - name: Clone star-drive.
+    - name: Clone star-drive
       git:
         repo: https://github.com/sartography/star-drive.git
         version: staging
@@ -68,6 +109,22 @@
         requirements: ~/star-drive/backend/requirements.txt
         virtualenv: ~/python-venv/
         virtualenv_python: python3
+
+    - name: run npm install
+      shell: npm install
+
+    - name: Install Angular.js
+      npm:
+        name: "@angular/cli@10"
+        global: yes
+        state: present
+      become: yes
+
+    - name: install angular prereqs
+      shell: cd ~/star-drive/frontend && npm install
+
+    - name: compile angular server
+      shell: cd ~/star-drive/frontend && ng build
 
     - name: bind to localhost for elastic search
       lineinfile:
@@ -104,14 +161,6 @@
         name: redis
         state: stopped
       become: yes
-
-    #- name: copy docker-compose file
-    #  copy:
-    #    src: ../../star-drive
-    #    dest: /home/sartography
-    #    mode: '600'
-    #- name: start docker-compose for star-drive dev
-    #  shell: docker-compose -f /home/sartography/star-drive/docker-compose.yml up --detach
 
     - name: Create db user, set password, grant privs
       community.postgresql.postgresql_user:
@@ -171,16 +220,6 @@
       become: true
       become_user: postgres
 
-    - name: run npm install
-      shell: npm install
- 
-    - name: Install Angular.js
-      npm:
-        name: "@angular/cli@10"
-        global: yes
-        state: present
-      become: yes 
-      
     - name: Ensures {{project_root}}/conf dir exists
       file: path=~/star-drive/backend/instance state=directory
     - name: Copy configs
@@ -195,49 +234,58 @@
         src: ~/star-drive/backend/instance/config/default.py
         dest: ~/star-drive/backend/instance/config.py
         remote_src: yes
-    
+
     - name: Copy init script
       copy:
-        src: ./runflask.sh
+        src: ./scripts/star-drive/runflask.sh
         dest: ~/
+
+    - name: Copy flask config into the correct location
+      copy:
+        src: ./configs/star-drive/flask/digitalocean.py
+        dest: ~/star-drive/backend/instance/config.py
+
+    - name: Copy nginx config into the correct location
+      copy:
+        src: ./configs/star-drive/nginx/default.conf
+        dest: /etc/nginx/conf.d/default.conf
+      become: yes
 
     - name: run flask server 
       shell: bash  ~/runflask.sh
       environment:
         FLASK_APP: ~/star-drive/app/__init__.py
 
-    - name: install angular prereqs 
-      shell: cd ~/star-drive/frontend && npm install
-      
-    #- name: compile angular server 
-    #  shell: cd ~/star-drive/frontend && ng build
-
-    - name: copy dists to www-data 
+    - name: copy dists to html dir
       copy:
-        src: /home/elad/sartography/star-drive/frontend/dist/star-drive/
-        dest: /var/www/
-        #remote_src: yes
-        owner: www-data
-        group: www-data
+        src: /home/sartography/star-drive/frontend/dist/star-drive/
+        dest: /usr/share/nginx/html/
+        remote_src: yes
+        owner: nginx
+        group: nginx
         mode: '0644'
       become: yes
 
+    - name: fix directory permissions for nginx
+      command: find /usr/share/nginx/html/ -type d -exec chmod -c 0755 {} \;
+      register: chmod_result
+      changed_when: "chmod_result.stdout != \"\""
+      become: yes
 
+    - name: Add a user to a password file and ensure permissions are set
+      community.general.htpasswd:
+        path: /etc/nginx/passwdfile
+        name: sartography
+        password: "{{ ba_password }}"
+        owner: root
+        group: nginx
+        mode: 0640
+      become: yes
 
-    #- name: migrate flask db    
-    #  shell: bash "source ~/python-venv/bin/activate && flask db migrate"
-    #  environment:
-    #    FLASK_APP: ~/star-dive/app/__init__.py
-
-    #- name: init flask db
-    #  shell: flask initdb
-    #  environment:
-    #    FLASK_APP: ~/star-dive/app/__init__.py
-
-    #- name: run flask server 
-    #  shell: nohup flask run &
-    #  environment:
-    #    FLASK_APP: ~/star-dive/app/__init__.py
-
-           
-  
+    - name: restart and enable service pick up config changes
+      systemd:
+        state: restarted
+        enabled: yes
+        name: nginx
+      become: yes
+      
