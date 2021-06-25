@@ -228,13 +228,6 @@
         dest: ~/star-drive/backend/instance
         remote_src: yes
         
-
-    - name: Copy default config into the correct location
-      copy:
-        src: ~/star-drive/backend/instance/config/default.py
-        dest: ~/star-drive/backend/instance/config.py
-        remote_src: yes
-
     - name: Copy init script
       copy:
         src: ./scripts/star-drive/runflask.sh
