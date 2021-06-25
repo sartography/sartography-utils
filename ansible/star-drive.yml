@@ -94,11 +94,20 @@
 
     - name: "enable npm update checking"
       shell: "npm ; sudo chown -R $USER:$(id -gn $USER) /home/sartography/.config"
-    
+
+    - name: "kill flask if it is running"
+      shell: "killall flask"
+      ignore_errors: yes
+
+    - name: Delete contents & directory for star-drive
+      file:
+        state: absent
+        path: ~/star-drive/
+
     - name: Clone star-drive
       git:
         repo: https://github.com/sartography/star-drive.git
-        version: staging
+        version: test/ansible
         dest: ~/star-drive/
         accept_hostkey: yes
         force: yes
@@ -169,7 +178,15 @@
         role_attr_flags: NOCREATEDB,NOSUPERUSER
       become: true
       become_user: postgres
-  
+
+    - name: Delete the database specified in vars
+      community.postgresql.postgresql_db:
+        name={{ db_name }}
+        template='template0'
+        state=absent
+      become: true
+      become_user: postgres
+
     - name: Create the database specified in vars
       community.postgresql.postgresql_db: 
         name={{ db_name }}
@@ -227,7 +244,7 @@
         src: ~/star-drive/backend/config
         dest: ~/star-drive/backend/instance
         remote_src: yes
-        
+
     - name: Copy init script
       copy:
         src: ./scripts/star-drive/runflask.sh
@@ -235,7 +252,7 @@
 
     - name: Copy flask config into the correct location
       copy:
-        src: ./configs/star-drive/flask/digitalocean.py
+        src: ./configs/star-drive/flask/digitalocean_secrets.py
         dest: ~/star-drive/backend/instance/config.py
 
     - name: Copy nginx config into the correct location
