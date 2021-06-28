@@ -107,7 +107,7 @@
     - name: Clone star-drive
       git:
         repo: https://github.com/sartography/star-drive.git
-        version: test/ansible
+        version: feature/resourcerefactor
         dest: ~/star-drive/
         accept_hostkey: yes
         force: yes
@@ -131,6 +131,11 @@
 
     - name: install angular prereqs
       shell: cd ~/star-drive/frontend && npm install
+
+    - name: Copy Angular Environment Configuration
+      copy:
+        src: ./configs/star-drive/angular/digitalocean.ts
+        dest: ~/star-drive/frontend/src/environments/environment.ts
 
     - name: compile angular server
       shell: cd ~/star-drive/frontend && ng build
