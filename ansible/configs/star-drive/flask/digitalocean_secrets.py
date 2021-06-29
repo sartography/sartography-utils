@@ -6,8 +6,8 @@ DEVELOPMENT = True
 TESTING = False
 MIRRORING = False
 
-API_URL = "http://143.198.34.127"
-SITE_URL = "http://143.198.34.127"
+API_URL = "https://star.sartography.com"
+SITE_URL = "https://star.sartography.com"
 
 SECRET_KEY = 'stardrive_impossibly_bad_key_stored_in_public_repo_dont_use_this_ouside_development_yuck!'
 
