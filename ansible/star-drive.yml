@@ -271,6 +271,19 @@
       environment:
         FLASK_APP: ~/star-drive/app/__init__.py
 
+    - name: Copy resources.sql into a temp location.
+      copy:
+        src: ./scripts/star-drive/resources.sql
+        dest: /tmp/resources.sql
+
+    - name: Load additional data into the database
+      shell: "psql {{ db_name }} < /tmp/resources.sql"
+      become: true
+      become_user: postgres
+
+    - name: Re-Run the flask initindex - to update the search index with the additional data.
+      shell: bash  ~/reindex.sh
+
     - name: copy dists to html dir
       copy:
         src: /home/sartography/star-drive/frontend/dist/star-drive/
