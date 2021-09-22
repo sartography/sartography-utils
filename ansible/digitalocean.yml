@@ -33,6 +33,7 @@
             - public_keys/aaron
             - public_keys/aaron-linux
             - public_keys/alicia
+            - public_keys/alicia-76
 
       - name: set timezone to utc
         timezone:
