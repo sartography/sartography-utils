@@ -1,0 +1,10 @@
+"DB_NAME","r01"
+"DB_USER","pi_user"
+"DB_PASS","pi_pass"
+"DB_ROOT_PASS","pi_pass"
+"DOCKER_IMAGE_VERSION","r01"
+"POSTGRES_MULTIPLE_DATABASES","crc_dev,crc_test,pb,pb_test"
+"PATH_BASE","$HOME/sartography/docker-volumes/star-drive/"
+"PRODUCTION","false"
+"PORT_RANGE_START",5000
+"DEPLOYMENT_IDENTIFIER",""

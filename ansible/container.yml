@@ -1,0 +1,23 @@
+- hosts: prod
+  user: sartography
+  #become: yes
+  gather_facts: no
+  tasks:
+    - name: Start docker service
+      service:
+        name: docker
+        state: started
+      become: yes
+    - name: copy docker-compose file
+      copy:
+        src: ../../MT-Java/docker-compose.yml
+        dest: /home/sartography
+        mode: '600'
+    - name: copy docker config files
+      copy:
+        src: ../../MT-Java/dockerconfs
+        dest: /home/sartography/
+        mode: '600'
+    - name: start docker-compose for Mindtrails r01 dev
+      shell: docker-compose -f /home/sartography/docker-compose.yml up --detach
+
