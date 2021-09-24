@@ -107,7 +107,7 @@
     - name: Clone star-drive
       git:
         repo: https://github.com/sartography/star-drive.git
-        version: feature/resourcerefactor
+        version: update/studies-resources
         dest: ~/star-drive/
         accept_hostkey: yes
         force: yes
@@ -288,8 +288,8 @@
       become: true
       become_user: postgres
 
-    - name: Re-Run the flask initindex - to update the search index with the additional data.
-      shell: bash  ~/reindex.sh
+    # - name: Re-Run the flask initindex - to update the search index with the additional data.
+    #  shell: bash  ~/reindex.sh
 
     - name: run flask server
       shell: bash  ~/runflask.sh
@@ -328,10 +328,10 @@
     - name: create letsencrypt directory
       file: name=/var/www/letsencrypt state=directory
 
-    - name: Create letsencrypt certificate
-      shell: sudo letsencrypt certonly -n --webroot -w /var/www/letsencrypt -m dan@sartography.com --agree-tos -d star.sartography.com
-      args:
-        creates: /etc/letsencrypt/live/star.sartography.com
+    #- name: Create letsencrypt certificate
+    #  shell: sudo letsencrypt certonly -n --webroot -w /var/www/letsencrypt -m dan@sartography.com --agree-tos -d star.sartography.com
+    #  args:
+    #   creates: /etc/letsencrypt/live/star.sartography.com
 
     - name: Generate dhparams
       shell: sudo openssl dhparam -out /etc/nginx/dhparams.pem 4096
